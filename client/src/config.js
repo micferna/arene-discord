@@ -1,5 +1,8 @@
 // Equilibrage & classes. Tout se regle ici.
 
+// Identifiant de build affiche a l'ecran (sert a verifier qu'on tourne bien la derniere version).
+export const BUILD = 'perf2';
+
 export const ARENA = {
   radius: 14,        // rayon du ring (les combattants sont clampes a l'interieur)
   ringHeight: 1,     // hauteur de la plateforme

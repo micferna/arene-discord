@@ -39,6 +39,14 @@ body {
 }
 #announce.show { opacity: 1; }
 
+/* Compteur perf (FPS / qualité / build) */
+#perf {
+  position: absolute; bottom: 8px; left: 10px;
+  font: 12px/1.3 ui-monospace, Menlo, Consolas, monospace;
+  color: #7CFC98; background: rgba(0,0,0,.5); padding: 3px 9px; border-radius: 6px;
+  letter-spacing: .3px;
+}
+
 /* Compteur de combo */
 #combo {
   position: absolute; top: 34%; right: 8%;

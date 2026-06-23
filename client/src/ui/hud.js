@@ -17,6 +17,7 @@ export class HUD {
       </div>
       <div id="announce"></div>
       <div id="combo"></div>
+      <div id="perf"></div>
       <div id="controls">
         <b>ZQSD</b> bouger · <b>Souris</b> viser · <b>Clic G</b> coup · <b>Clic D</b> charge ·
         <b>Espace</b> saut · <b>Ctrl</b> esquive · <b>Maj</b> garde · <b>E</b> super · <b>V</b> vue
@@ -58,6 +59,8 @@ export class HUD {
   }
 
   hideOverlay() { this.$('overlay').classList.add('hidden'); }
+
+  setPerf(text) { this.$('perf').textContent = text; }
 
   setNames(p1, p2) {
     this.$('p1name').textContent = p1 ?? '—';

@@ -4,7 +4,7 @@ import { buildArena } from './Arena.js';
 import { Fighter } from './Fighter.js';
 import { Input } from './Input.js';
 import { AI } from './AI.js';
-import { CLASSES, CLASS_LIST, COMBAT, ARENA } from '../config.js';
+import { CLASSES, CLASS_LIST, COMBAT, ARENA, BUILD } from '../config.js';
 
 export class Game {
   constructor(canvas, hud, net, user) {
@@ -14,10 +14,14 @@ export class Game {
     this.localId = user.id;
 
     // --- rendu ---
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // Dans l'iframe Discord (desktop), souvent peu/pas de GPU : on démarre plus bas.
+    const embedded = location.hostname.includes('discordsays') ||
+      new URLSearchParams(location.search).has('frame_id');
+
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !embedded, powerPreference: 'high-performance' });
     // Qualité adaptative : on démarre raisonnable et la boucle baisse la résolution si ça rame.
-    this.dpr = Math.min(devicePixelRatio || 1, 1.25);
-    this.dprFloor = 0.7;
+    this.dpr = Math.min(devicePixelRatio || 1, embedded ? 1.0 : 1.25);
+    this.dprFloor = embedded ? 0.5 : 0.7;
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
@@ -26,6 +30,7 @@ export class Game {
     this.renderer.toneMappingExposure = 1.05;
     this._fpsAccum = 0;
     this._fpsFrames = 0;
+    this._fpsSmooth = 60;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 200);
@@ -70,18 +75,39 @@ export class Game {
     this.renderer.setSize(innerWidth, innerHeight);
   }
 
-  // Mesure le FPS sur ~1 s et baisse la résolution interne si ça rame (jusqu'au plancher).
-  _monitorPerf(dt) {
-    this._fpsAccum += dt;
+  // Coupe les ombres (dernier recours quand baisser la résolution n'a pas suffi).
+  _disableShadows() {
+    if (!this.renderer.shadowMap.enabled) return;
+    this.renderer.shadowMap.enabled = false;
+    this.scene.traverse((o) => {
+      if (!o.material) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      for (const m of mats) m.needsUpdate = true; // recompile sans ombres
+    });
+  }
+
+  // Mesure le FPS réel ; si ça rame : 1) baisse la résolution, 2) coupe les ombres. Affiche les infos.
+  _monitorPerf(rawDt) {
+    const fpsNow = rawDt > 0 ? 1 / rawDt : 60;
+    this._fpsSmooth += (fpsNow - this._fpsSmooth) * 0.1;
+    this._fpsAccum += rawDt;
     this._fpsFrames++;
     if (this._fpsAccum >= 1) {
       const fps = this._fpsFrames / this._fpsAccum;
-      if (fps < 48 && this.dpr > this.dprFloor) {
-        this._setDPR(Math.max(this.dprFloor, Math.round((this.dpr - 0.2) * 100) / 100));
+      if (fps < 48) {
+        if (this.dpr > this.dprFloor) {
+          this._setDPR(Math.max(this.dprFloor, Math.round((this.dpr - 0.2) * 100) / 100));
+        } else if (this.renderer.shadowMap.enabled) {
+          this._disableShadows();
+        }
       }
       this._fpsAccum = 0;
       this._fpsFrames = 0;
     }
+    this.hud.setPerf(
+      `${Math.round(this._fpsSmooth)} FPS · ${this.dpr.toFixed(2)}x · ` +
+      `${this.renderer.shadowMap.enabled ? 'ombres' : 'sans ombres'} · build ${BUILD}`
+    );
   }
 
   // ---------- gestion des combattants ----------
@@ -544,9 +570,10 @@ export class Game {
   // ---------- boucle ----------
   start() {
     const loop = (now) => {
-      const dt = Math.min(0.05, (now - this.last) / 1000) || 0;
+      const rawDt = (now - this.last) / 1000;
+      const dt = Math.min(0.05, rawDt) || 0;
       this.last = now;
-      this._monitorPerf(dt);
+      this._monitorPerf(rawDt);
 
       // reset des drapeaux de frame
       for (const f of this.fighters.values()) { f._moving = false; f._blocking = false; }
