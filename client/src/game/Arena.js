@@ -12,7 +12,7 @@ export function buildArena(scene) {
   const dir = new THREE.DirectionalLight(0xffffff, 1.4);
   dir.position.set(12, 24, 8);
   dir.castShadow = true;
-  dir.shadow.mapSize.set(2048, 2048);
+  dir.shadow.mapSize.set(1024, 1024);
   dir.shadow.camera.near = 1;
   dir.shadow.camera.far = 80;
   dir.shadow.camera.left = -25;

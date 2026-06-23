@@ -14,13 +14,18 @@ export class Game {
     this.localId = user.id;
 
     // --- rendu ---
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // Qualité adaptative : on démarre raisonnable et la boucle baisse la résolution si ça rame.
+    this.dpr = Math.min(devicePixelRatio || 1, 1.25);
+    this.dprFloor = 0.7;
+    this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
+    this._fpsAccum = 0;
+    this._fpsFrames = 0;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 200);
@@ -57,6 +62,26 @@ export class Game {
     this.camera.aspect = innerWidth / innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(innerWidth, innerHeight);
+  }
+
+  _setDPR(v) {
+    this.dpr = v;
+    this.renderer.setPixelRatio(v);
+    this.renderer.setSize(innerWidth, innerHeight);
+  }
+
+  // Mesure le FPS sur ~1 s et baisse la résolution interne si ça rame (jusqu'au plancher).
+  _monitorPerf(dt) {
+    this._fpsAccum += dt;
+    this._fpsFrames++;
+    if (this._fpsAccum >= 1) {
+      const fps = this._fpsFrames / this._fpsAccum;
+      if (fps < 48 && this.dpr > this.dprFloor) {
+        this._setDPR(Math.max(this.dprFloor, Math.round((this.dpr - 0.2) * 100) / 100));
+      }
+      this._fpsAccum = 0;
+      this._fpsFrames = 0;
+    }
   }
 
   // ---------- gestion des combattants ----------
@@ -521,6 +546,7 @@ export class Game {
     const loop = (now) => {
       const dt = Math.min(0.05, (now - this.last) / 1000) || 0;
       this.last = now;
+      this._monitorPerf(dt);
 
       // reset des drapeaux de frame
       for (const f of this.fighters.values()) { f._moving = false; f._blocking = false; }
