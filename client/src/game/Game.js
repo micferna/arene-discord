@@ -79,7 +79,8 @@ export class Game {
   _disableShadows() {
     if (!this.renderer.shadowMap.enabled) return;
     this.renderer.shadowMap.enabled = false;
-    this.scene.traverse((o) => {
+    this.scene.traverse((obj) => {
+      const o = /** @type {any} */ (obj);
       if (!o.material) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
       for (const m of mats) m.needsUpdate = true; // recompile sans ombres
