@@ -1,0 +1,35 @@
+{
+  "name": "arene-discord-activity",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Jeu de combat 3D temps reel — Discord Activity (Embedded App SDK + Three.js + WebSocket).",
+  "type": "module",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace server & npm run dev --workspace client",
+    "dev:server": "npm run dev --workspace server",
+    "dev:client": "npm run dev --workspace client",
+    "build": "npm run build --workspace client",
+    "start": "npm run start --workspace server",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run lint && npm run typecheck && npm run build",
+    "bench": "node bench/relay.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.0.0",
+    "@types/three": "^0.171.0",
+    "eslint": "^9.39.4",
+    "globals": "^17.7.0",
+    "typescript": "^6.0.3"
+  }
+}

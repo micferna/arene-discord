@@ -1,0 +1,11 @@
+**/node_modules
+node_modules
+client/dist
+dist
+.git
+.gitignore
+*.log
+.env
+.env.*
+bench
+README.md

@@ -1,0 +1,13 @@
+# Stack RunShip (Docker Compose as a Service).
+# Un seul service Node qui sert le jeu, l'API OAuth et le WebSocket.
+services:
+  arene:
+    build: .
+    restart: unless-stopped
+    environment:
+      PORT: 3001
+      # Renseignés via `runship stack secrets` (pas en clair dans le repo).
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
+    ports:
+      - "3001:3001"
