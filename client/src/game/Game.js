@@ -20,21 +20,23 @@ export class Game {
 
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !embedded, powerPreference: 'high-performance' });
     // Qualité adaptative : on démarre raisonnable et la boucle baisse la résolution si ça rame.
-    this.dpr = Math.min(devicePixelRatio || 1, embedded ? 1.0 : 1.25);
-    this.dprFloor = embedded ? 0.5 : 0.7;
+    this.dpr = Math.min(devicePixelRatio || 1, embedded ? 0.8 : 1.25);
+    this.dprFloor = embedded ? 0.4 : 0.7;
     this.renderer.setPixelRatio(this.dpr);
     this.renderer.setSize(innerWidth, innerHeight);
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = !embedded;   // pas d'ombres d'entrée dans Discord
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this._fpsAccum = 0;
     this._fpsFrames = 0;
     this._fpsSmooth = 60;
+    this._potato = false;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 200);
     this.arena = buildArena(this.scene);
+    this._pointLights = this.arena.pointLights || [];
 
     // Environment map (reflets doux sur les materiaux metalliques) sans fichier externe.
     const pmrem = new THREE.PMREMGenerator(this.renderer);
@@ -75,7 +77,7 @@ export class Game {
     this.renderer.setSize(innerWidth, innerHeight);
   }
 
-  // Coupe les ombres (dernier recours quand baisser la résolution n'a pas suffi).
+  // Coupe les ombres (recompile les matériaux sans la passe d'ombres).
   _disableShadows() {
     if (!this.renderer.shadowMap.enabled) return;
     this.renderer.shadowMap.enabled = false;
@@ -83,11 +85,36 @@ export class Game {
       const o = /** @type {any} */ (obj);
       if (!o.material) return;
       const mats = Array.isArray(o.material) ? o.material : [o.material];
-      for (const m of mats) m.needsUpdate = true; // recompile sans ombres
+      for (const m of mats) m.needsUpdate = true;
     });
   }
 
-  // Mesure le FPS réel ; si ça rame : 1) baisse la résolution, 2) coupe les ombres. Affiche les infos.
+  // Mode "patate" (dernier recours, GPU faible/absent) : matériaux Lambert légers,
+  // plus de reflets (env map) ni de lumières d'ambiance. Le jeu reste lisible et fluide.
+  _potatoMode() {
+    if (this._potato) return;
+    this._potato = true;
+    this.scene.environment = null;
+    for (const l of this._pointLights) this.scene.remove(l);
+    const swap = (m) => {
+      if (m && m.isMeshStandardMaterial) {
+        const lm = new THREE.MeshLambertMaterial({
+          color: m.color, emissive: m.emissive, emissiveIntensity: m.emissiveIntensity,
+          transparent: m.transparent, opacity: m.opacity, side: m.side, map: m.map,
+        });
+        m.dispose();
+        return lm;
+      }
+      return m;
+    };
+    this.scene.traverse((obj) => {
+      const o = /** @type {any} */ (obj);
+      if (!o.material) return;
+      o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+    });
+  }
+
+  // Mesure le FPS réel ; si ça rame : 1) baisse la résolution, 2) coupe les ombres, 3) mode patate.
   _monitorPerf(rawDt) {
     const fpsNow = rawDt > 0 ? 1 / rawDt : 60;
     this._fpsSmooth += (fpsNow - this._fpsSmooth) * 0.1;
@@ -100,15 +127,15 @@ export class Game {
           this._setDPR(Math.max(this.dprFloor, Math.round((this.dpr - 0.2) * 100) / 100));
         } else if (this.renderer.shadowMap.enabled) {
           this._disableShadows();
+        } else if (!this._potato && fps < 40) {
+          this._potatoMode();
         }
       }
       this._fpsAccum = 0;
       this._fpsFrames = 0;
     }
-    this.hud.setPerf(
-      `${Math.round(this._fpsSmooth)} FPS · ${this.dpr.toFixed(2)}x · ` +
-      `${this.renderer.shadowMap.enabled ? 'ombres' : 'sans ombres'} · build ${BUILD}`
-    );
+    const mode = this._potato ? 'patate' : (this.renderer.shadowMap.enabled ? 'ombres' : 'sans ombres');
+    this.hud.setPerf(`${Math.round(this._fpsSmooth)} FPS · ${this.dpr.toFixed(2)}x · ${mode} · build ${BUILD}`);
   }
 
   // ---------- gestion des combattants ----------
@@ -153,6 +180,7 @@ export class Game {
     this.scene.add(f.group);
     this.ai = new AI(f);
     this.placeFighters();
+    this.hud.announce('Entraînement vs IA · invite des amis dans le salon vocal pour jouer ensemble 🎮', 4000);
   }
 
   removeAI() {

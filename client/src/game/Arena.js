@@ -84,5 +84,5 @@ export function buildArena(scene) {
     scene.add(rope);
   }
 
-  return { radius: R, floorY: ARENA.ringHeight };
+  return { radius: R, floorY: ARENA.ringHeight, pointLights: [spotA, spotB] };
 }
